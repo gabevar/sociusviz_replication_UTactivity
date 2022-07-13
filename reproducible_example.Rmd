@@ -1,0 +1,95 @@
+---
+title: "Reproducible Example"
+description: |
+  This Rmd reproduces the three radar plots found in [paper]
+author:
+  - name: Gabriel Varela 
+date: "`r Sys.Date()`"
+editor_options: 
+  chunk_output_type: inline
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = FALSE)
+```
+
+### Import packages
+
+```{r, warning = F, message = F}
+library(ggradar)
+library(extrafont)
+library(tidyverse)
+```
+
+```{r}
+setwd(dirname(rstudioapi::getSourceEditorContext()$path))
+path <- getwd()
+```
+
+### Prep Data
+
+```{r, message = F}
+repro_df <- read_csv(paste0(path, "/reproducible_data.csv"))
+
+transform_df <- function(x) { 
+  x %>%
+  pivot_longer(cols = contains("_")) %>% 
+  mutate(caste = case_when(caste == 0 ~ "SC/ST",
+                                 caste == 1 ~ "OBC",
+                                 caste == 2 ~ "General")) %>%
+  mutate(behavior = str_extract(name, "^[a-z]+")) %>% 
+  group_by(behavior, caste) %>% 
+  summarise(value = mean(value), .groups = 'drop') %>% 
+  pivot_wider(names_from = behavior, values_from = value)
+}
+
+prior_repro <- repro_df %>% 
+  select(caste, contains("_prior")) %>%
+  transform_df()
+
+during_repro <- repro_df %>% 
+  select(caste, contains("_during")) %>%
+  transform_df()
+
+after_repro <- repro_df %>% 
+  select(caste, contains("_after")) %>%
+  transform_df()
+```
+
+### Create radar plots
+
+```{r}
+create_radar <- function(x) { 
+ ggradar(
+  x,
+  values.radar = c("1", "5", "8"),
+  grid.min = 1, grid.mid = 5, grid.max = 8,
+  # Polygons
+  group.line.width = 0.5, 
+  group.point.size = 2,
+  group.colours = c("#00AFBB", "#E7B800", "#FC4E07"),
+  # Background and grid lines
+  background.circle.colour = "white",
+  gridline.mid.colour = "grey",
+  # legend.position = "none",
+  font.radar = "sans",
+  axis.label.size = 7,
+  grid.label.size = 8, 
+  plot.extent.x.sf = 1.2)
+}
+
+save_radar <- function(x) {
+  ggsave(filename = paste0(path, "/", deparse(substitute(x)), ".pdf"),
+         plot = x, width = 12, height = 6, device = "pdf")
+}
+
+prior_radar <- create_radar(prior_repro)
+during_radar <- create_radar(during_repro)
+after_radar <- create_radar(after_repro)
+
+save_radar(prior_radar)
+save_radar(during_radar)
+save_radar(after_radar)
+```
+
+
